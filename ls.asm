@@ -343,7 +343,7 @@ main(int argc, char *argv[])
  33b:	e9 c0 fe ff ff       	jmp    200 <ls+0x100>
 
 00000340 <strcpy>:
-#include "mmu.h"
+#include "mmu.h"  // dealing with low-level memory management tasks
 #include "x86.h"
 
 char*
@@ -740,17 +740,18 @@ memmove(void *vdst, const void *vsrc, int n)
 
 00000590 <thread_create>:
 
+// defining functions bodies
 int thread_create(void (*start_routine)(void *, void *), void* arg1, void* arg2)
 {
  590:	55                   	push   %ebp
  591:	89 e5                	mov    %esp,%ebp
  593:	83 ec 14             	sub    $0x14,%esp
-  void* stack;
-  stack = malloc(PGSIZE);
+  void* threadStack;
+  threadStack = malloc(PGSIZE); // taking memory for a page size
  596:	68 00 10 00 00       	push   $0x1000
  59b:	e8 20 04 00 00       	call   9c0 <malloc>
 
-  return clone(start_routine, arg1, arg2, stack);
+  return clone(start_routine, arg1, arg2, threadStack);
  5a0:	50                   	push   %eax
  5a1:	ff 75 10             	push   0x10(%ebp)
  5a4:	ff 75 0c             	push   0xc(%ebp)
@@ -785,11 +786,11 @@ int thread_join()
 
 000005e0 <lock_init>:
 
-int lock_init(lock_t *lk)
+int lock_init(lock_thread *lk)
 {
  5e0:	55                   	push   %ebp
  5e1:	89 e5                	mov    %esp,%ebp
-  lk->flag = 0;
+  lk->isLocked = 0;
  5e3:	8b 45 08             	mov    0x8(%ebp),%eax
  5e6:	c7 00 00 00 00 00    	movl   $0x0,(%eax)
   return 0;
@@ -800,7 +801,7 @@ int lock_init(lock_t *lk)
 
 000005f0 <lock_acquire>:
 
-void lock_acquire(lock_t *lk){
+void lock_acquire(lock_thread *lk){
  5f0:	55                   	push   %ebp
 xchg(volatile uint *addr, uint newval)
 {
@@ -815,7 +816,9 @@ xchg(volatile uint *addr, uint newval)
  5ff:	90                   	nop
  600:	89 c8                	mov    %ecx,%eax
  602:	f0 87 02             	lock xchg %eax,(%edx)
-  while(xchg(&lk->flag, 1) != 0);
+  //prevent interruption .
+  //take a pointer to a lock_thread structure as an argument and returns nothing (void).
+  while(xchg(&lk->isLocked, 1) != 0);
  605:	85 c0                	test   %eax,%eax
  607:	75 f7                	jne    600 <lock_acquire+0x10>
 }
@@ -826,13 +829,14 @@ xchg(volatile uint *addr, uint newval)
 
 00000610 <lock_release>:
 
-void lock_release(lock_t *lk){
+void lock_release(lock_thread *lk){
  610:	55                   	push   %ebp
  611:	31 c0                	xor    %eax,%eax
  613:	89 e5                	mov    %esp,%ebp
  615:	8b 55 08             	mov    0x8(%ebp),%edx
  618:	f0 87 02             	lock xchg %eax,(%edx)
-	xchg(&lk->flag, 0);
+  // xchg = exchange
+	xchg(&lk->isLocked, 0);
  61b:	5d                   	pop    %ebp
  61c:	c3                   	ret    
 

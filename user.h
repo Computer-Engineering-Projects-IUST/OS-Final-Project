@@ -4,7 +4,7 @@ struct stat;
 struct rtcdate;
 // adding struce for locking the whole thread
 typedef struct __lock_thread{
-  int isLocked;
+  uint isLocked;
 }lock_thread;
 
 // system calls
