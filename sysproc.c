@@ -90,21 +90,19 @@ sys_uptime(void)
   return xticks;
 }
 
-int
-sys_clone(void)
+int sys_clone(void) // system call for cloning - Checking arguments
 {
-  int fcn, arg1, arg2, stack;
-  if(argint(0, &fcn)<0 || argint(1, &arg1)<0 || argint(2, &arg2)<0 || argint(3, &stack)<0)
+  int functionName, argument1, argument2, stack;
+  if(argint(0, &functionName)<0 || argint(1, &argument1)<0 || argint(2, &argument2)<0 || argint(3, &stack)<0)
     return -1;
-  return clone((void *)fcn, (void *)arg1, (void *)arg2, (void *)stack);
+  return clone((void *)functionName, (void *)argument1, (void *)argument2, (void *)stack);
 }
 
-int
-sys_join(void)
+int sys_join(void) // system call for joining
 {
-  void **stack;
-  int stackArg;
-  stackArg = argint(0, &stackArg);
-  stack = (void**) stackArg;
-  return join(stack);
+  void **joinStack;
+  int joinStackArg;
+  joinStackArg = argint(0, &joinStackArg);
+  joinStack = (void**) joinStackArg;
+  return join(joinStack);
 }
