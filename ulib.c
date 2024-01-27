@@ -2,6 +2,7 @@
 #include "stat.h"
 #include "fcntl.h"
 #include "user.h"
+#include "mmu.h"  // dealing with low-level memory management tasks
 #include "x86.h"
 
 char*
@@ -103,4 +104,37 @@ memmove(void *vdst, const void *vsrc, int n)
   while(n-- > 0)
     *dst++ = *src++;
   return vdst;
+}
+
+// defining functions bodies
+int thread_create(void (*start_routine)(void *, void *), void* arg1, void* arg2)
+{
+  void* threadStack;
+  threadStack = malloc(PGSIZE); // taking memory for a page size
+
+  return clone(start_routine, arg1, arg2, threadStack);
+}
+
+int thread_join()
+{
+  void * stackPtr;
+  int x = join(&stackPtr);
+  return x;
+}
+
+int lock_init(lock_thread *lk)
+{
+  lk->isLocked = 0;
+  return 0;
+}
+
+void lock_acquire(lock_thread *lk){
+  //prevent interruption .
+  //take a pointer to a lock_thread structure as an argument and returns nothing (void).
+  while(xchg(&lk->isLocked, 1) != 0);
+}
+
+void lock_release(lock_thread *lk){
+  // xchg = exchange
+	xchg(&lk->isLocked, 0);
 }

@@ -1,5 +1,11 @@
+// #ifndef __USER__
+
 struct stat;
 struct rtcdate;
+// adding struce for locking the whole thread
+typedef struct __lock_thread{
+  int isLocked;
+}lock_thread;
 
 // system calls
 int fork(void);
@@ -23,6 +29,9 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+// adding clone and join signature
+int clone(void (*start_routine)(void*,void*), void *, void *, void *);
+int join(void**);
 
 // ulib.c
 int stat(const char*, struct stat*);
@@ -37,3 +46,12 @@ void* memset(void*, int, uint);
 void* malloc(uint);
 void free(void*);
 int atoi(const char*);
+
+// other functions needed:
+int thread_create(void (*start_routine)(void *,void*), void * arg1, void * arg2);
+int thread_join(); 
+int lock_init(lock_thread *lk);
+void lock_acquire(lock_thread *lk);
+void lock_release(lock_thread *lk);
+
+// #endif
