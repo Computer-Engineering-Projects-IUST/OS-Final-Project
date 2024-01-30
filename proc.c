@@ -88,7 +88,6 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-  p->turn = 1;
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -434,23 +433,12 @@ wait(void)
 //  - swtch to start running that process
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
-void 
-SwichProc(struct proc *p )
-{
-  struct cpu *c = mycpu();
-  c->proc=p;
-  switchuvm(p);
-  p->state = RUNNING;
-  // cprintf("pid :%d \n" , p->pid )  ; 
-  swtch(&(c->scheduler), p->context);
-  switchkvm();
-  c->proc = 0;
-}
+
 
 void
 scheduler(void)
 {
-  struct proc *p , *child_p ;
+  struct proc *p , *childProc ;
   struct cpu *c = mycpu();
   c->proc = 0;
 
@@ -476,34 +464,36 @@ scheduler(void)
           c->proc=p;
           switchuvm(p);
           p->state = RUNNING;
+          cprintf("process :%d \n" , p->pid ); 
           swtch(&(c->scheduler), p->context);
           switchkvm();
           c->proc = 0;
         }
-        if ( p->turn > 0 )
+        if ( p->turn != 0 )
         {
-          int cnt = 1; 
-          for(child_p = ptable.proc; child_p < &ptable.proc[NPROC]; child_p++)
+          int count = 1; 
+          for(childProc = ptable.proc; childProc < &ptable.proc[NPROC]; childProc++)
           {
-            if ( child_p->parent == p && child_p->IsThread==1 ) // && child_p->state == RUNNABLE
+            if ( childProc->parent == p && childProc->IsThread==1 &&  childProc->state == RUNNABLE ) // && childProc->state == RUNNABLE
             {
-              if ( child_p->state == RUNNABLE )
-              {
-                if (cnt == p->turn)
+              // if ( childProc->state == RUNNABLE )
+              // {
+                if (count == p->turn)
                 {
-                  // SwichProc(child_p);
+                  // SwichProc(childProc);
                   struct cpu *c = mycpu();
-                  c->proc=child_p;
-                  switchuvm(child_p);
-                  child_p->state = RUNNING;
-                  swtch(&(c->scheduler), child_p->context);
+                  c->proc=childProc;
+                  switchuvm(childProc);
+                  childProc->state = RUNNING;
+                  cprintf("process :%d \n" , childProc->pid ); 
+                  swtch(&(c->scheduler), childProc->context);
                   switchkvm();
                   c->proc = 0;
 
                   break;  
                 }  
-                cnt++ ; 
-              }
+                count++ ; 
+              // }
             }
           }
         }
@@ -516,6 +506,7 @@ scheduler(void)
         c->proc=p;
         switchuvm(p);
         p->state = RUNNING;
+        cprintf("process :%d \n" , p->pid ); 
         swtch(&(c->scheduler), p->context);
         switchkvm();
         c->proc = 0;

@@ -2,62 +2,35 @@
 #include "stat.h"
 #include "user.h"
 #include "fcntl.h"
-#define SLEEP_TIME 100
+
 
 lock_thread* lk;
 
-void f1(void* arg1, void* arg2) {
-  int num = *(int*)arg1;
-  if (num) lock_acquire(lk);
-  printf(1, "1. this should print %s\n", num ? "first" : "whenever");
-  printf(1, "1. sleep for %d ticks\n", SLEEP_TIME);
-  sleep(SLEEP_TIME);
-  if (num) lock_release(lk);
-  exit();
-}
 
-void f2(void* arg1, void* arg2) {
-  int num = *(int*)arg1;
-  if (num) lock_acquire(lk);
-  printf(1, "2. this should print %s\n", num ? "second" : "whenever");
-  printf(1, "2. sleep for %d ticks\n", SLEEP_TIME);
-  sleep(SLEEP_TIME);
-  if (num) lock_release(lk);
-  exit();
-}
 
-void f3(void* arg1, void* arg2) {
-  int num = *(int*)arg1;
-  if (num) lock_acquire(lk);
-  printf(1, "3. this should print %s\n", num ? "third" : "whenever");
-  printf(1, "3. sleep for %d ticks\n", SLEEP_TIME);
-  sleep(SLEEP_TIME);
-  if (num) lock_release(lk);
+void add(void* arg1, void* arg2) {
+  lock_acquire(lk);
+  int num1 = *(int*)arg1;
+  int num2 = *(int*)arg2;
+  printf(1, "this should print %d\n ", num1 + num2);
+  //sleep(10);
+  lock_release(lk); 
   exit();
 }
 
 int
 main(int argc, char *argv[])
 {
-  lock_init(lk);
-  int arg1 = 1, arg2 = 1;
-
-  printf(1, "below should be sequential print statements:\n");
-  thread_create(&f1, (void *)&arg1, (void *)&arg2);
-  thread_create(&f2, (void *)&arg1, (void *)&arg2);
-  thread_create(&f3, (void *)&arg1, (void *)&arg2);
+  lock_init(lk) ; 
+  printf(1, "test executing threads with lock :\n");
+  int arg1 = 9, arg2 = 1 ; 
+  thread_create(&add, (void *)&arg1, (void *)&arg2);
+  int arg3 = 4 , arg4 = 2;
+  thread_create(&add, (void *)&arg3, (void *)&arg4);
+  int arg5 = 7 ,  arg6 = 4;
+  thread_create(&add, (void *)&arg5, (void *)&arg6);
   thread_join();
   thread_join();
   thread_join();
-
-  arg1 = 0;
-  printf(1, "below should be a jarbled mess:\n");
-  thread_create(&f1, (void *)&arg1, (void *)&arg2);
-  thread_create(&f2, (void *)&arg1, (void *)&arg2);
-  thread_create(&f3, (void *)&arg1, (void *)&arg2);
-  thread_join();
-  thread_join();
-  thread_join();
-  
-  exit();
+  exit() ; 
 }
