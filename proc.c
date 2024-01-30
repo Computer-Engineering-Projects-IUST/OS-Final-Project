@@ -434,91 +434,94 @@ wait(void)
 //  - swtch to start running that process
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
-void scheduler(void)
+void 
+SwichProc(struct proc *p )
 {
-  struct proc *p;
-  struct proc *j;
   struct cpu *c = mycpu();
-  struct proc *lastParent = NULL;
+  c->proc=p;
+  switchuvm(p);
+  p->state = RUNNING;
+  // cprintf("pid :%d \n" , p->pid )  ; 
+  swtch(&(c->scheduler), p->context);
+  switchkvm();
+  c->proc = 0;
+}
+
+void
+scheduler(void)
+{
+  struct proc *p , *child_p ;
+  struct cpu *c = mycpu();
   c->proc = 0;
 
   for(;;){
     // Enable interrupts on this processor.
     sti();
-    cprintf("This is the first loop\n");
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-
-    // int Found = 0;
-
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      cprintf("This is the Second loop\n");
-      if(p->state != RUNNABLE || (lastParent != NULL && (p == lastParent || p->parent ==lastParent)) || p->IsThread == 1)
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){  
+      if((p->state != RUNNABLE && !(p->state == SLEEPING  && p->childCount>0 )) || p->IsThread == 1 )
+      {
         continue;
-
-      if (p->childCount != 0){
-        struct proc *currentChild = NULL;
-        int count = 0;
-        int currentTurn = p->turn;
-
-        for(j = ptable.proc; j < &ptable.proc[NPROC]; j++){
-          cprintf("This is the third loop\n");
-          if(j->IsThread == 1 && j->state == RUNNABLE){
-            if (count == currentTurn){
-              // Run and context switch child
-              currentChild = j;
-              c->proc = currentChild;
-              switchuvm(currentChild);
-              currentChild->state = RUNNING;
-
-              swtch(&(c->scheduler), currentChild->context);
-              switchkvm();
-              p->turn = ((p->turn + 1) % (p->childCount + 1)) + 1;
-
-              // Process is done running for now.
-              c->proc = 0; 
-              // Found = 1;
-              break;
-            }
-            count++;
-          }
+      }
+      if ( p->childCount != 0 &&  p->turn == 0)
+      {
+        if(p->state == SLEEPING ) 
+        {
+          p->turn = 1 ;
         }
-
-        if(currentChild == NULL) {
-          // If no child was scheduled, schedule the parent
-          c->proc = p;
+        else{ 
+          // SwichProc(p);
+          struct cpu *c = mycpu();
+          c->proc=p;
           switchuvm(p);
           p->state = RUNNING;
-
           swtch(&(c->scheduler), p->context);
           switchkvm();
-
-          p->turn = (p->turn + 1) % (p->childCount + 1);
           c->proc = 0;
-          // Found = 1;
         }
+        if ( p->turn > 0 )
+        {
+          int cnt = 1; 
+          for(child_p = ptable.proc; child_p < &ptable.proc[NPROC]; child_p++)
+          {
+            if ( child_p->parent == p && child_p->IsThread==1 ) // && child_p->state == RUNNABLE
+            {
+              if ( child_p->state == RUNNABLE )
+              {
+                if (cnt == p->turn)
+                {
+                  // SwichProc(child_p);
+                  struct cpu *c = mycpu();
+                  c->proc=child_p;
+                  switchuvm(child_p);
+                  child_p->state = RUNNING;
+                  swtch(&(c->scheduler), child_p->context);
+                  switchkvm();
+                  c->proc = 0;
 
-        lastParent = p;  // Update the last parent that was scheduled
+                  break;  
+                }  
+                cnt++ ; 
+              }
+            }
+          }
+        }
+        p->turn = (p->turn+1)%(p->childCount+1) ; 
       }
-      else {
-        // Run and context switch parent (no children)
-        c->proc = p;
+      else
+      {
+        // SwichProc(p) ; 
+        struct cpu *c = mycpu();
+        c->proc=p;
         switchuvm(p);
         p->state = RUNNING;
-
         swtch(&(c->scheduler), p->context);
         switchkvm();
-
-        // Process is done running for now.
-        c->proc = 0;    
-        // Found = 1;
+        c->proc = 0;
       }
     }
     release(&ptable.lock);
-    // if (Found == 0) {
-    //   // No runnable processes were found, halt the CPU
-    //   hlt();
-    // }
   }
 }
 
