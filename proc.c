@@ -6,7 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
-
+#include <stddef.h>
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -88,7 +88,7 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-
+  p->turn = 1;
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -236,7 +236,7 @@ clone(void(*fcn)(void*,void*), void *arg1, void *arg2, void* stack)
   np->sz = p->sz;
   np->parent = p;
   *np->tf = *p->tf;
-  
+  np->IsThread = 1;
   void * sarg1, *sarg2, *sret;
 
   // Push fake return address to the stack of thread
@@ -278,6 +278,8 @@ clone(void(*fcn)(void*,void*), void *arg1, void *arg2, void* stack)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
+
+  p -> childCount++;
 
   release(&ptable.lock);
 
@@ -432,41 +434,94 @@ wait(void)
 //  - swtch to start running that process
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
-void
-scheduler(void)
+void scheduler(void)
 {
   struct proc *p;
+  struct proc *j;
   struct cpu *c = mycpu();
+  struct proc *lastParent = NULL;
   c->proc = 0;
-  
+
   for(;;){
     // Enable interrupts on this processor.
     sti();
-
+    cprintf("This is the first loop\n");
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
+
+    // int Found = 0;
+
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
+      cprintf("This is the Second loop\n");
+      if(p->state != RUNNABLE || (lastParent != NULL && (p == lastParent || p->parent ==lastParent)) || p->IsThread == 1)
         continue;
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
+      if (p->childCount != 0){
+        struct proc *currentChild = NULL;
+        int count = 0;
+        int currentTurn = p->turn;
 
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
+        for(j = ptable.proc; j < &ptable.proc[NPROC]; j++){
+          cprintf("This is the third loop\n");
+          if(j->IsThread == 1 && j->state == RUNNABLE){
+            if (count == currentTurn){
+              // Run and context switch child
+              currentChild = j;
+              c->proc = currentChild;
+              switchuvm(currentChild);
+              currentChild->state = RUNNING;
 
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+              swtch(&(c->scheduler), currentChild->context);
+              switchkvm();
+              p->turn = ((p->turn + 1) % (p->childCount + 1)) + 1;
+
+              // Process is done running for now.
+              c->proc = 0; 
+              // Found = 1;
+              break;
+            }
+            count++;
+          }
+        }
+
+        if(currentChild == NULL) {
+          // If no child was scheduled, schedule the parent
+          c->proc = p;
+          switchuvm(p);
+          p->state = RUNNING;
+
+          swtch(&(c->scheduler), p->context);
+          switchkvm();
+
+          p->turn = (p->turn + 1) % (p->childCount + 1);
+          c->proc = 0;
+          // Found = 1;
+        }
+
+        lastParent = p;  // Update the last parent that was scheduled
+      }
+      else {
+        // Run and context switch parent (no children)
+        c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
+
+        // Process is done running for now.
+        c->proc = 0;    
+        // Found = 1;
+      }
     }
     release(&ptable.lock);
-
+    // if (Found == 0) {
+    //   // No runnable processes were found, halt the CPU
+    //   hlt();
+    // }
   }
 }
+
 
 // Enter scheduler.  Must hold only ptable.lock
 // and have changed proc->state. Saves and restores
