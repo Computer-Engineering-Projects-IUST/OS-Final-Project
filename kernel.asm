@@ -7983,7 +7983,7 @@ wakeup1(void *chan)
   c = mycpu();
 80103ffa:	e8 f1 f8 ff ff       	call   801038f0 <mycpu>
   p = c->proc;
-80103fff:	8b 98 ac 00 00 00    	mov    0xac(%eax),%ebx
+80103fff:	8b b0 ac 00 00 00    	mov    0xac(%eax),%esi
   popcli();
 80104005:	e8 f6 06 00 00       	call   80104700 <popcli>
   acquire(&ptable.lock);
@@ -7991,83 +7991,81 @@ wakeup1(void *chan)
 8010400d:	68 20 1d 11 80       	push   $0x80111d20
 80104012:	e8 e9 07 00 00       	call   80104800 <acquire>
 80104017:	83 c4 10             	add    $0x10,%esp
-    while(p < &ptable.proc[NPROC]) {
-8010401a:	b8 d4 1d 11 80       	mov    $0x80111dd4,%eax
     hasChild = 0;
-8010401f:	31 d2                	xor    %edx,%edx
-80104021:	eb 0f                	jmp    80104032 <join+0x42>
+8010401a:	31 c0                	xor    %eax,%eax
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+8010401c:	bb 54 1d 11 80       	mov    $0x80111d54,%ebx
+80104021:	eb 10                	jmp    80104033 <join+0x43>
 80104023:	8d 74 26 00          	lea    0x0(%esi,%eiz,1),%esi
 80104027:	90                   	nop
-    while(p < &ptable.proc[NPROC]) {
-80104028:	83 e8 80             	sub    $0xffffff80,%eax
-8010402b:	3d d4 3d 11 80       	cmp    $0x80113dd4,%eax
-80104030:	74 25                	je     80104057 <join+0x67>
-80104032:	8d 70 80             	lea    -0x80(%eax),%esi
-      if(p->parent != cp || p->pgdir != p->parent->pgdir) {
-80104035:	39 58 98             	cmp    %ebx,-0x68(%eax)
-80104038:	75 ee                	jne    80104028 <join+0x38>
-8010403a:	8b 4b 04             	mov    0x4(%ebx),%ecx
-8010403d:	39 48 84             	cmp    %ecx,-0x7c(%eax)
-80104040:	75 e6                	jne    80104028 <join+0x38>
+80104028:	83 eb 80             	sub    $0xffffff80,%ebx
+8010402b:	81 fb 54 3d 11 80    	cmp    $0x80113d54,%ebx
+80104031:	74 23                	je     80104056 <join+0x66>
+      if(p->parent != cp || p->pgdir != p->parent->pgdir)
+80104033:	39 73 18             	cmp    %esi,0x18(%ebx)
+80104036:	75 f0                	jne    80104028 <join+0x38>
+80104038:	8b 56 04             	mov    0x4(%esi),%edx
+8010403b:	39 53 04             	cmp    %edx,0x4(%ebx)
+8010403e:	75 e8                	jne    80104028 <join+0x38>
       if(p->state == ZOMBIE){
-80104042:	83 78 90 05          	cmpl   $0x5,-0x70(%eax)
-80104046:	74 60                	je     801040a8 <join+0xb8>
-    while(p < &ptable.proc[NPROC]) {
-80104048:	83 e8 80             	sub    $0xffffff80,%eax
+80104040:	83 7b 10 05          	cmpl   $0x5,0x10(%ebx)
+80104044:	74 62                	je     801040a8 <join+0xb8>
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+80104046:	83 eb 80             	sub    $0xffffff80,%ebx
       hasChild = 1;
-8010404b:	ba 01 00 00 00       	mov    $0x1,%edx
-    while(p < &ptable.proc[NPROC]) {
-80104050:	3d d4 3d 11 80       	cmp    $0x80113dd4,%eax
-80104055:	75 db                	jne    80104032 <join+0x42>
+80104049:	b8 01 00 00 00       	mov    $0x1,%eax
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+8010404e:	81 fb 54 3d 11 80    	cmp    $0x80113d54,%ebx
+80104054:	75 dd                	jne    80104033 <join+0x43>
     if(!hasChild || cp->killed){
-80104057:	85 d2                	test   %edx,%edx
-80104059:	0f 84 9d 00 00 00    	je     801040fc <join+0x10c>
-8010405f:	8b 43 28             	mov    0x28(%ebx),%eax
-80104062:	85 c0                	test   %eax,%eax
-80104064:	0f 85 92 00 00 00    	jne    801040fc <join+0x10c>
+80104056:	85 c0                	test   %eax,%eax
+80104058:	0f 84 9e 00 00 00    	je     801040fc <join+0x10c>
+8010405e:	8b 46 28             	mov    0x28(%esi),%eax
+80104061:	85 c0                	test   %eax,%eax
+80104063:	0f 85 93 00 00 00    	jne    801040fc <join+0x10c>
   pushcli();
-8010406a:	e8 41 06 00 00       	call   801046b0 <pushcli>
+80104069:	e8 42 06 00 00       	call   801046b0 <pushcli>
   c = mycpu();
-8010406f:	e8 7c f8 ff ff       	call   801038f0 <mycpu>
+8010406e:	e8 7d f8 ff ff       	call   801038f0 <mycpu>
   p = c->proc;
-80104074:	8b b0 ac 00 00 00    	mov    0xac(%eax),%esi
+80104073:	8b 98 ac 00 00 00    	mov    0xac(%eax),%ebx
   popcli();
-8010407a:	e8 81 06 00 00       	call   80104700 <popcli>
+80104079:	e8 82 06 00 00       	call   80104700 <popcli>
   if(p == 0)
-8010407f:	85 f6                	test   %esi,%esi
-80104081:	0f 84 8c 00 00 00    	je     80104113 <join+0x123>
+8010407e:	85 db                	test   %ebx,%ebx
+80104080:	0f 84 8d 00 00 00    	je     80104113 <join+0x123>
   p->chan = chan;
-80104087:	89 5e 24             	mov    %ebx,0x24(%esi)
+80104086:	89 73 24             	mov    %esi,0x24(%ebx)
   p->state = SLEEPING;
-8010408a:	c7 46 10 02 00 00 00 	movl   $0x2,0x10(%esi)
+80104089:	c7 43 10 02 00 00 00 	movl   $0x2,0x10(%ebx)
   sched();
-80104091:	e8 6a fd ff ff       	call   80103e00 <sched>
+80104090:	e8 6b fd ff ff       	call   80103e00 <sched>
   p->chan = 0;
-80104096:	c7 46 24 00 00 00 00 	movl   $0x0,0x24(%esi)
+80104095:	c7 43 24 00 00 00 00 	movl   $0x0,0x24(%ebx)
 }
-8010409d:	e9 78 ff ff ff       	jmp    8010401a <join+0x2a>
-801040a2:	8d b6 00 00 00 00    	lea    0x0(%esi),%esi
+8010409c:	e9 79 ff ff ff       	jmp    8010401a <join+0x2a>
+801040a1:	8d b4 26 00 00 00 00 	lea    0x0(%esi,%eiz,1),%esi
         kfree(p->kstack);
 801040a8:	83 ec 0c             	sub    $0xc,%esp
         pid = p->pid;
-801040ab:	8b 58 94             	mov    -0x6c(%eax),%ebx
+801040ab:	8b 73 14             	mov    0x14(%ebx),%esi
         kfree(p->kstack);
-801040ae:	ff 70 88             	push   -0x78(%eax)
+801040ae:	ff 73 08             	push   0x8(%ebx)
 801040b1:	e8 0a e4 ff ff       	call   801024c0 <kfree>
         p->kstack = 0;
-801040b6:	c7 46 08 00 00 00 00 	movl   $0x0,0x8(%esi)
+801040b6:	c7 43 08 00 00 00 00 	movl   $0x0,0x8(%ebx)
         p->pid = 0;
-801040bd:	c7 46 14 00 00 00 00 	movl   $0x0,0x14(%esi)
+801040bd:	c7 43 14 00 00 00 00 	movl   $0x0,0x14(%ebx)
         p->parent = 0;
-801040c4:	c7 46 18 00 00 00 00 	movl   $0x0,0x18(%esi)
+801040c4:	c7 43 18 00 00 00 00 	movl   $0x0,0x18(%ebx)
         p->name[0] = 0;
-801040cb:	c6 46 70 00          	movb   $0x0,0x70(%esi)
+801040cb:	c6 43 70 00          	movb   $0x0,0x70(%ebx)
         p->killed = 0;
-801040cf:	c7 46 28 00 00 00 00 	movl   $0x0,0x28(%esi)
+801040cf:	c7 43 28 00 00 00 00 	movl   $0x0,0x28(%ebx)
         p->state = UNUSED;
-801040d6:	c7 46 10 00 00 00 00 	movl   $0x0,0x10(%esi)
+801040d6:	c7 43 10 00 00 00 00 	movl   $0x0,0x10(%ebx)
         p->threadstack = 0;
-801040dd:	c7 46 0c 00 00 00 00 	movl   $0x0,0xc(%esi)
+801040dd:	c7 43 0c 00 00 00 00 	movl   $0x0,0xc(%ebx)
         release(&ptable.lock);
 801040e4:	c7 04 24 20 1d 11 80 	movl   $0x80111d20,(%esp)
 801040eb:	e8 b0 06 00 00       	call   801047a0 <release>
@@ -8075,7 +8073,7 @@ wakeup1(void *chan)
 801040f0:	83 c4 10             	add    $0x10,%esp
 }
 801040f3:	8d 65 f8             	lea    -0x8(%ebp),%esp
-801040f6:	89 d8                	mov    %ebx,%eax
+801040f6:	89 f0                	mov    %esi,%eax
 801040f8:	5b                   	pop    %ebx
 801040f9:	5e                   	pop    %esi
 801040fa:	5d                   	pop    %ebp
@@ -8083,7 +8081,7 @@ wakeup1(void *chan)
       release(&ptable.lock);
 801040fc:	83 ec 0c             	sub    $0xc,%esp
       return -1;
-801040ff:	bb ff ff ff ff       	mov    $0xffffffff,%ebx
+801040ff:	be ff ff ff ff       	mov    $0xffffffff,%esi
       release(&ptable.lock);
 80104104:	68 20 1d 11 80       	push   $0x80111d20
 80104109:	e8 92 06 00 00       	call   801047a0 <release>

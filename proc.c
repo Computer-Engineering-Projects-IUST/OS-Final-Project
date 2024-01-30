@@ -181,168 +181,126 @@ int
 fork(void)
 {
   int i, pid;
-  struct proc *newP;
+  struct proc *np;
   struct proc *curproc = myproc();
 
   // Allocate process.
-  if((newP = allocproc()) == 0){
+  if((np = allocproc()) == 0){
     return -1;
   }
 
   // Copy process state from proc.
-  if((newP->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
-    kfree(newP->kstack);
-    newP->kstack = 0;
-    newP->state = UNUSED;
+  if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
+    kfree(np->kstack);
+    np->kstack = 0;
+    np->state = UNUSED;
     return -1;
   }
-  newP->sz = curproc->sz;
-  newP->parent = curproc;
-  *newP->tf = *curproc->tf;
+  np->sz = curproc->sz;
+  np->parent = curproc;
+  *np->tf = *curproc->tf;
 
   // Clear %eax so that fork returns 0 in the child.
-  newP->tf->eax = 0;
+  np->tf->eax = 0;
 
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
-      newP->ofile[i] = filedup(curproc->ofile[i]);
-  newP->cwd = idup(curproc->cwd);
+      np->ofile[i] = filedup(curproc->ofile[i]);
+  np->cwd = idup(curproc->cwd);
 
-  safestrcpy(newP->name, curproc->name, sizeof(curproc->name));
+  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
-  pid = newP->pid;
+  pid = np->pid;
 
   acquire(&ptable.lock);
 
-  newP->state = RUNNABLE;
+  np->state = RUNNABLE;
 
   release(&ptable.lock);
 
   return pid;
 }
 
-int clone(void(*functionName)(void*,void*), void *argument1, void *argument2, void* stack)
+int 
+clone(void(*fcn)(void*,void*), void *arg1, void *arg2, void* stack)
 {
-  struct proc *newP;
+  struct proc *np;
   struct proc *p = myproc();
 
   // Allocate process.
-  if((newP = allocproc()) == 0)
+  if((np = allocproc()) == 0)
     return -1;
 
   // Copy process data to the new thread
-  newP->pgdir = p->pgdir;
-  newP->sz = p->sz;
-  newP->parent = p;
-  *newP->tf = *p->tf;
+  np->pgdir = p->pgdir;
+  np->sz = p->sz;
+  np->parent = p;
+  *np->tf = *p->tf;
   
-  void * sargument1, *sargument2, *sret;
+  void * sarg1, *sarg2, *sret;
 
   // Push fake return address to the stack of thread
   sret = stack + PGSIZE - 3 * sizeof(void *);
   *(uint*)sret = 0xFFFFFFF;
 
   // Push first argument to the stack of thread
-  sargument1 = stack + PGSIZE - 2 * sizeof(void *);
-  *(uint*)sargument1 = (uint)argument1;
+  sarg1 = stack + PGSIZE - 2 * sizeof(void *);
+  *(uint*)sarg1 = (uint)arg1;
 
   // Push second argument to the stack of thread
-  sargument2 = stack + PGSIZE - 1 * sizeof(void *);
-  *(uint*)sargument2 = (uint)argument2;
+  sarg2 = stack + PGSIZE - 1 * sizeof(void *);
+  *(uint*)sarg2 = (uint)arg2;
 
   // Put address of new stack in the stack pointer (ESP)
-  newP->tf->esp = (uint) stack;
+  np->tf->esp = (uint) stack;
 
   // Save address of stack
-  newP->threadstack = stack;
+  np->threadstack = stack;
 
   // Initialize stack pointer to appropriate address
-  newP->tf->esp += PGSIZE - 3 * sizeof(void*);
-  newP->tf->ebp = newP->tf->esp;
+  np->tf->esp += PGSIZE - 3 * sizeof(void*);
+  np->tf->ebp = np->tf->esp;
 
   // Set instruction pointer to given function
-  newP->tf->eip = (uint) functionName;
+  np->tf->eip = (uint) fcn;
 
   // Clear %eax so that fork returns 0 in the child.
-  newP->tf->eax = 0;
+  np->tf->eax = 0;
 
   int i;
   for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])
-      newP->ofile[i] = filedup(p->ofile[i]);
-  newP->cwd = idup(p->cwd);
+      np->ofile[i] = filedup(p->ofile[i]);
+  np->cwd = idup(p->cwd);
 
-  safestrcpy(newP->name, p->name, sizeof(p->name));
+  safestrcpy(np->name, p->name, sizeof(p->name));
  
   acquire(&ptable.lock);
 
-  newP->state = RUNNABLE;
+  np->state = RUNNABLE;
 
   release(&ptable.lock);
 
-  return newP->pid;
+  return np->pid;
 }
 
-int join(void** stack)
+int
+join(void** stack)
 {
   struct proc *p;
-  int hasChild, pid;
+  int havekids, pid;
   struct proc *cp = myproc();
   acquire(&ptable.lock);
-  // for(;;){
-  //   // Scan through table looking for zombie children.
-  //   hasChild = 0;
-  //   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-
-  //     // Check if this is a child thread (parent or shared address space)
-  //     if(p->parent != cp || p->pgdir != p->parent->pgdir)
-  //       continue;
-        
-  //     hasChild = 1;
-  //     if(p->state == ZOMBIE){
-  //       // Found one.
-  //       pid = p->pid;
-
-  //       // Remove thread from the kernel stack
-  //       kfree(p->kstack);
-  //       p->kstack = 0;
-
-  //       // Reset thread in process table
-  //       p->pid = 0;
-  //       p->parent = 0;
-  //       p->name[0] = 0;
-  //       p->killed = 0;
-  //       p->state = UNUSED;
-  //       stack = p->threadstack;
-  //       p->threadstack = 0;
-
-  //       release(&ptable.lock);
-  //       return pid;
-  //     }
-  //   }
-
-  //   // No point waiting if we don't have any children.
-  //   if(!hasChild || cp->killed){
-  //     release(&ptable.lock);
-  //     return -1;
-  //   }
-
-  //   // Wait for children to exit.  (See wakeup1 call in proc_exit.)
-  //   sleep(cp, &ptable.lock);  //DOC: wait-sleep
-  // }
-  p = ptable.proc;
-  while(1) {
+  for(;;){
     // Scan through table looking for zombie children.
-    hasChild = 0;
-    while(p < &ptable.proc[NPROC]) {
+    havekids = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
 
       // Check if this is a child thread (parent or shared address space)
-      if(p->parent != cp || p->pgdir != p->parent->pgdir) {
-        p++; // Move to the next process in the table.
+      if(p->parent != cp || p->pgdir != p->parent->pgdir)
         continue;
-      }
-
-      hasChild = 1;
+        
+      havekids = 1;
       if(p->state == ZOMBIE){
         // Found one.
         pid = p->pid;
@@ -363,13 +321,10 @@ int join(void** stack)
         release(&ptable.lock);
         return pid;
       }
-      p++; // Move to the next process in the table.
     }
 
-    p = ptable.proc; // Reset p to start of the process table for the next iteration of outer loop
-
     // No point waiting if we don't have any children.
-    if(!hasChild || cp->killed){
+    if(!havekids || cp->killed){
       release(&ptable.lock);
       return -1;
     }
@@ -431,17 +386,17 @@ int
 wait(void)
 {
   struct proc *p;
-  int hasChild, pid;
+  int havekids, pid;
   struct proc *curproc = myproc();
   
   acquire(&ptable.lock);
   for(;;){
     // Scan through table looking for exited children.
-    hasChild = 0;
+    havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->parent != curproc)
         continue;
-      hasChild = 1;
+      havekids = 1;
       if(p->state == ZOMBIE){
         // Found one.
         pid = p->pid;
@@ -459,7 +414,7 @@ wait(void)
     }
 
     // No point waiting if we don't have any children.
-    if(!hasChild || curproc->killed){
+    if(!havekids || curproc->killed){
       release(&ptable.lock);
       return -1;
     }
